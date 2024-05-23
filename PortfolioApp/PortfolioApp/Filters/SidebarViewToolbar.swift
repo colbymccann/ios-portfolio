@@ -10,7 +10,7 @@ import SwiftUI
 struct SidebarViewToolbar: View {
     @EnvironmentObject var dataController: DataController
     @Binding var showingAwards: Bool
-    
+
     var body: some View {
         Button {
             showingAwards.toggle()

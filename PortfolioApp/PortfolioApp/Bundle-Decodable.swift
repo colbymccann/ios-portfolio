@@ -7,6 +7,7 @@
 
 import Foundation
 
+// swiftlint:disable line_length
 extension Bundle {
     func decode<T: Decodable>(
         _ file: String,
@@ -38,3 +39,4 @@ extension Bundle {
         }
     }
 }
+// swiftlint:enable line_length

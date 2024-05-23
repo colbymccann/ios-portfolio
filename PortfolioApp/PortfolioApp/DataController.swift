@@ -6,6 +6,7 @@
 //
 
 import CoreData
+import SwiftUI
 
 class DataController: ObservableObject {
     let container: NSPersistentCloudKitContainer
@@ -19,56 +20,87 @@ class DataController: ObservableObject {
     @Published var sortType = SortType.dateCreated
     @Published var sortNewestFirst = true
     private var saveTask: Task<Void, Error>?
-    
+
     enum SortType: String {
         case dateCreated = "creationDate"
         case dateModified = "modificationDate"
     }
-    
+
     enum Status {
         case all, open, closed
     }
-    
+
     init(inMemory: Bool = false) {
-        container = NSPersistentCloudKitContainer(name: "Main")
+        container = NSPersistentCloudKitContainer(name: "Main", managedObjectModel: Self.model)
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump
-        container.persistentStoreDescriptions.first?.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-        NotificationCenter.default.addObserver(forName: .NSPersistentStoreRemoteChange, object: container.persistentStoreCoordinator, queue: .main, using: remoteStoreChanged)
-        
+        container.persistentStoreDescriptions.first?.setOption(
+            true as NSNumber,
+            forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey
+        )
+
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator,
+            queue: .main,
+            using: remoteStoreChanged
+        )
+
+//      When in testing mode, initialize a ephemeral database
         if inMemory {
                 container.persistentStoreDescriptions.first?.url = URL(filePath: "/dev/null")
         }
-        
-        container.loadPersistentStores { storeDescription, error in
-            if let error {
+
+        container.loadPersistentStores { _, error in
+            if let error = error {
                 fatalError("Fatal error loading store: \(error.localizedDescription)")
             }
+
+            #if DEBUG
+            if CommandLine.arguments.contains("enable-testing") {
+                self.deleteAll()
+                UIView.setAnimationsEnabled(false)
+            }
+            #endif
         }
     }
-    
+
+    static let model: NSManagedObjectModel = {
+        guard let url = Bundle.main.url(forResource: "Main", withExtension: "momd") else {
+            fatalError("Failed to locate model file.")
+        }
+
+        guard let managedObjectModel = NSManagedObjectModel(contentsOf: url) else {
+            fatalError("Failed to load model file.")
+        }
+
+        return managedObjectModel
+    }()
+
     func newIssue() {
         let issue = Issue(context: container.viewContext)
         issue.title = NSLocalizedString("New issue", comment: "Create a new tag")
         issue.creationDate = .now
         issue.priority = 1
-        
+
+//        if we're currently filtering by a tag,
+//        then add this new issue to that tag
         if let tag = selectedFilter?.tag {
             issue.addToTags(tag)
         }
-        
+
         save()
-        
+
         selectedIssue = issue
     }
-    
+
     func newTag() {
         let tag = Tag(context: container.viewContext)
         tag.id = UUID()
         tag.name = NSLocalizedString("New tag", comment: "Create a new tag")
         save()
     }
-    
+
     func missingTags(from issue: Issue) -> [Tag] {
         let request = Tag.fetchRequest()
         let allTags = (try? container.viewContext.fetch(request)) ?? []
@@ -78,7 +110,7 @@ class DataController: ObservableObject {
 
         return difference.sorted()
     }
-    
+
     func issuesForSelectedFilter() -> [Issue] {
         let filter = selectedFilter ?? .all
         var predicates = [NSPredicate]()
@@ -96,7 +128,9 @@ class DataController: ObservableObject {
         if trimmedFilterText.isEmpty == false {
             let titlePredicate = NSPredicate(format: "title CONTAINS[c] %@", trimmedFilterText)
             let contentPredicate = NSPredicate(format: "content CONTAINS[c] %@", trimmedFilterText)
-            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [titlePredicate, contentPredicate])
+            let combinedPredicate = NSCompoundPredicate(
+                orPredicateWithSubpredicates: [titlePredicate, contentPredicate]
+            )
             predicates.append(combinedPredicate)
         }
 
@@ -116,7 +150,7 @@ class DataController: ObservableObject {
                 predicates.append(statusFilter)
             }
         }
-        
+
         let request = Issue.fetchRequest()
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
         request.sortDescriptors = [NSSortDescriptor(key: sortType.rawValue, ascending: sortNewestFirst)]
@@ -124,12 +158,8 @@ class DataController: ObservableObject {
         let allIssues = (try? container.viewContext.fetch(request)) ?? []
         return allIssues
     }
-    
-    var suggestedFilterTokens: [Tag] {
-//        guard filterText.starts(with: "#") else {
-//            return []
-//        }
 
+    var suggestedFilterTokens: [Tag] {
         let trimmedFilterText = String(filterText.dropFirst()).trimmingCharacters(in: .whitespaces)
         let request = Tag.fetchRequest()
 
@@ -140,7 +170,6 @@ class DataController: ObservableObject {
         return (try? container.viewContext.fetch(request).sorted()) ?? []
     }
 
-    
     func save() {
         saveTask?.cancel()
 
@@ -148,33 +177,33 @@ class DataController: ObservableObject {
             try? container.viewContext.save()
         }
     }
-    
+
     func queueSave() {
         saveTask?.cancel()
-
         saveTask = Task { @MainActor in
             try await Task.sleep(for: .seconds(3))
             save()
         }
     }
-    
+
     func delete(_ object: NSManagedObject) {
         objectWillChange.send()
         container.viewContext.delete(object)
         save()
     }
-    
+
     private func delete(_ fetchRequest: NSFetchRequest<NSFetchRequestResult>) {
         let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
         batchDeleteRequest.resultType = .resultTypeObjectIDs
-        
 
+//        we have to do it this way to ensure
+//        that remote changes stay in sync with our live view.
         if let delete = try? container.viewContext.execute(batchDeleteRequest) as? NSBatchDeleteResult {
             let changes = [NSDeletedObjectsKey: delete.result as? [NSManagedObjectID] ?? []]
             NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [container.viewContext])
         }
     }
-    
+
     func deleteAll() {
         let request1: NSFetchRequest<NSFetchRequestResult> = Tag.fetchRequest()
         delete(request1)
@@ -184,15 +213,15 @@ class DataController: ObservableObject {
 
         save()
     }
-    
+
     func remoteStoreChanged(_ notification: Notification) {
         objectWillChange.send()
     }
-    
+
     func count<T>(for fetchRequest: NSFetchRequest<T>) -> Int {
         (try? container.viewContext.count(for: fetchRequest)) ?? 0
     }
-    
+
     func hasEarned(award: Award) -> Bool {
         switch award.criterion {
         case "issues":
@@ -220,18 +249,18 @@ class DataController: ObservableObject {
             return false
         }
     }
-    
+
     func createSampleData() {
         let viewContext = container.viewContext
 
-        for i in 1...5 {
+        for tagCounter in 1...5 {
             let tag = Tag(context: viewContext)
             tag.id = UUID()
-            tag.name = "Tag \(i)"
+            tag.name = "Tag \(tagCounter)"
 
-            for j in 1...10 {
+            for issueCounter in 1...10 {
                 let issue = Issue(context: viewContext)
-                issue.title = "Issue \(i)-\(j)"
+                issue.title = "Issue \(tagCounter)-\(issueCounter)"
                 issue.content = "Description goes here"
                 issue.creationDate = .now
                 issue.completed = Bool.random()
@@ -239,10 +268,9 @@ class DataController: ObservableObject {
                 tag.addToIssues(issue)
             }
         }
-
         try? viewContext.save()
     }
-    
+
     static var preview: DataController = {
         let dataController = DataController(inMemory: true)
         dataController.createSampleData()

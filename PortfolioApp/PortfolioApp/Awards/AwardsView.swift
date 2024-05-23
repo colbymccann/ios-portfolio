@@ -21,15 +21,15 @@ struct AwardsView: View {
     var columns: [GridItem] {
         [GridItem(.adaptive(minimum: 100, maximum: 100))]
     }
-    
+
     func color(for award: Award) -> Color {
         dataController.hasEarned(award: award) ? Color(award.color) : .secondary.opacity(0.5)
     }
-    
+
     func label(for award: Award) -> LocalizedStringKey {
         dataController.hasEarned(award: award) ? "Unlocked: \(award.name)" : "Locked"
     }
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -44,7 +44,7 @@ struct AwardsView: View {
                                 .scaledToFit()
                                 .padding()
                                 .frame(width: 100, height: 100)
-                                .foregroundColor(color(for: award))
+                                .foregroundStyle(color(for: award))
                         }
                         .accessibilityLabel(label(for: award))
                         .accessibilityHint(award.description)

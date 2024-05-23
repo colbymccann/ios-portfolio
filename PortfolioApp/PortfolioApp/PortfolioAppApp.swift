@@ -11,13 +11,13 @@ import SwiftUI
 struct PortfolioAppApp: App {
     @StateObject var dataController = DataController()
     @Environment(\.scenePhase) var scenePhase
-    
+
     var body: some Scene {
         WindowGroup {
-            NavigationSplitView{
-                SidebarView()
+            NavigationSplitView {
+                SidebarView(dataController: dataController)
             } content: {
-                ContentView()
+                ContentView(dataController: dataController)
             } detail: {
                 DetailView()
             }

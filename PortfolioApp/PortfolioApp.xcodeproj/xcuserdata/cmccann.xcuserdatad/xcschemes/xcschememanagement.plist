@@ -9,10 +9,25 @@
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
+		<key>PortfolioAppUITests.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
 		<key>D34092E62BDCB3AE00BF383B</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>D379F8FD2BFF961700F4064A</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>D379F90D2BFFA65100F4064A</key>
 		<dict>
 			<key>primary</key>
 			<true/>

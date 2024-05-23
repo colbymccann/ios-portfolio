@@ -11,24 +11,20 @@ extension Issue {
         get { title ?? "" }
         set { title = newValue }
     }
-    
+
     var issueContent: String {
         get { content ?? "" }
         set { content = newValue }
     }
-    
+
     var issueCreationDate: Date {
         creationDate ?? .now
     }
-    
+
     var issueModificationDate: Date {
         modificationDate ?? .now
     }
-    
-    var issueFormattedCreationDate: String {
-        issueCreationDate.formatted(date: .numeric, time: .omitted)
-    }
-    
+
     var issueStatus: String {
         if completed {
             return "Closed"
@@ -36,7 +32,7 @@ extension Issue {
             return "Open"
         }
     }
-    
+
     static var example: Issue {
         let controller = DataController(inMemory: true)
         let viewContext = controller.container.viewContext
@@ -52,10 +48,10 @@ extension Issue {
         let result = tags?.allObjects as? [Tag] ?? []
         return result.sorted()
     }
-    
+
     var issueTagsList: String {
         guard let tags else { return "No tags" }
-        
+
         if tags.count == 0 {
             return "No tags"
         } else {
@@ -65,7 +61,7 @@ extension Issue {
 }
 
 extension Issue: Comparable {
-    public static func <(lhs: Issue, rhs: Issue) -> Bool {
+    public static func < (lhs: Issue, rhs: Issue) -> Bool {
         let left = lhs.issueTitle.localizedLowercase
         let right = rhs.issueTitle.localizedLowercase
 
